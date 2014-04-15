@@ -31,9 +31,9 @@ static string blurFragShaderES2 = STRINGIFY
 (
      precision mediump float;
      uniform sampler2D tex0;
-     uniform float fade;
+//     uniform float fade;
      uniform float textureWidth;
-    //uniform float blurSize;
+//    uniform float blur;
      varying vec2 texCoordVarying;
  
  
@@ -163,6 +163,68 @@ static string blurFragShaderES2 = STRINGIFY
 
    }
 );
+
+//--------------------------------------------------------- GL3.
+static string blurXvertShaderGL3 = "#version 150\n" STRINGIFY
+(
+ 
+ 
+ // these are for the programmable pipeline system
+ uniform mat4 modelViewProjectionMatrix;
+ uniform mat4 textureMatrix;
+ 
+ in vec4 position;
+ in vec2 texcoord;
+ in vec4 normal;
+ in vec4 color;
+ 
+ out vec2 texCoordVarying;
+ 
+ void main()
+{
+#ifdef INTEL_CARD
+    color = vec4(1.0); // for intel HD cards
+    normal = vec4(1.0); // for intel HD cards
+#endif
+    
+    texCoordVarying = texcoord;
+	gl_Position = modelViewProjectionMatrix * position;
+}
+ 
+ );
+
+
+static string blurXfragShaderGL3 = "#version 150\n" STRINGIFY
+(
+ 
+ uniform sampler2DRect tex0;
+ uniform float blurAmnt;
+ 
+ in vec2 texCoordVarying;
+ out vec4 outputColor;
+ 
+ void main()
+{
+    
+    vec4 color;
+	
+    color += 1.0 * texture(tex0, texCoordVarying + vec2(blurAmnt * -4.0, 0.0));
+    color += 2.0 * texture(tex0, texCoordVarying + vec2(blurAmnt * -3.0, 0.0));
+    color += 3.0 * texture(tex0, texCoordVarying + vec2(blurAmnt * -2.0, 0.0));
+    color += 4.0 * texture(tex0, texCoordVarying + vec2(blurAmnt * -1.0, 0.0));
+    
+    color += 5.0 * texture(tex0, texCoordVarying + vec2(blurAmnt, 0));
+	
+    color += 4.0 * texture(tex0, texCoordVarying + vec2(blurAmnt * 1.0, 0.0));
+    color += 3.0 * texture(tex0, texCoordVarying + vec2(blurAmnt * 2.0, 0.0));
+    color += 2.0 * texture(tex0, texCoordVarying + vec2(blurAmnt * 3.0, 0.0));
+    color += 1.0 * texture(tex0, texCoordVarying + vec2(blurAmnt * 4.0, 0.0));
+    
+    color /= 25.0;
+    
+    outputColor = color;
+}
+ );
 
 
 

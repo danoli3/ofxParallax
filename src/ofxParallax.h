@@ -37,12 +37,17 @@ struct ofxParallaxLayer {
     }
     
     void draw(ofPoint offset) {
-        image->draw(pos.x+offset.x, pos.y+offset.y);
+        transformation.makeIdentityMatrix();
+        ofPushMatrix();
+        transformation.preMultTranslate(pos);
+        image->draw(0, 0);
+        ofPopMatrix();
     }
     
     // Variables
     ofImage * image;
     ofPoint pos;
+    ofMatrix4x4 transformation;
 };
 
 struct ofxParallaxLayers {
@@ -76,8 +81,7 @@ struct ofxParallaxLayers {
     
     void setup() {
         
-        
-        
+        scale = ofVec3f(0.5f,0.5f,0.5f);
         fboLayer = new ofFbo();
         
         if(size.x < 1 || size.y < 1) {
@@ -103,6 +107,7 @@ struct ofxParallaxLayers {
     }
     
     void update(float impulse) {
+        
 //        int number = layer.size()-1;
         if(layer.size() != 0) {
             lastFrameCollision = false;
@@ -123,12 +128,18 @@ struct ofxParallaxLayers {
 //                theLayer->update();
 //            }
         }
+        
+        transformation.makeIdentityMatrix();
+        transformation.preMultScale(scale);
+        transformation.preMultTranslate(offset);
     }
     
     void draw() {
+        ofPushMatrix();
+        ofMultMatrix(transformation);
         if(layer.size() != 0) {
             if(hasRenderedTexture == true) {
-                fboLayer->draw(offset);
+                fboLayer->draw(ofVec2f(0,0));
             } else {
             if(isBlurred && hasRenderedTexture == false) {
                 beginShader();
@@ -136,17 +147,18 @@ struct ofxParallaxLayers {
             int number = layer.size()-1;
             for(int i = 0; i<=number;i++) {
                 ofxParallaxLayer* theLayer = layer[i];
-                theLayer->draw(offset);
+                theLayer->draw(ofVec2f(0,0));
             }
             
             if(isBlurred && hasRenderedTexture == false) {
                 endShader();
                 if(hasRenderedTexture == true) {
-                    fboLayer->draw(offset);
+                    fboLayer->draw(ofVec2f(0,0));
                 }
             }
             }
         }
+        ofPopMatrix();
     }
     
     void beginShader() {
@@ -199,6 +211,8 @@ struct ofxParallaxLayers {
     ofVec2f offset;
     ofVec2f size;
     ofPoint collision;
+    ofMatrix4x4 transformation;
+    ofVec3f scale;
     
     bool isBlurred;
     bool hasRenderedTexture;
@@ -307,8 +321,16 @@ public:
         if(layers.size() != 0) {
             int number = layers.size()-1;
             for(int i = 0; i<=number;i++) {
-                ofxParallaxLayers* theLayer = layers[i];
                 layers[i]->setBlur(false);
+            }
+        }
+    }
+    
+    void blurAll() {
+        if(layers.size() != 0) {
+            int number = layers.size()-1;
+            for(int i = 0; i<=number;i++) {
+                layers[i]->setBlur(true);
             }
         }
     }
@@ -318,6 +340,16 @@ public:
             int number = layers.size()-1;
             if(layerID <= number){
                 layers[layerID]->setBlur(true);
+            }
+        }
+    }
+    
+    void blurAllExceptLayer(int layerID) {
+        if(layers.size() != 0) {
+            blurAll();
+            int number = layers.size()-1;
+            if(layerID <= number){
+                layers[layerID]->setBlur(false);
                 
             }
         }
