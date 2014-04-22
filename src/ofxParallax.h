@@ -14,25 +14,38 @@
 
 struct ofxParallaxLayer {
     ofxParallaxLayer()
-        : image(NULL), pos(0,0) { }
+        : texture(NULL), pos(0,0) { }
     ~ofxParallaxLayer() {
-        if(image != NULL) {
-            delete image;
-            image = NULL;
+        if(texture != NULL) {
+            delete texture;
+            texture = NULL;
         }
     }
     
     void setup(string path, ofPoint position) {
-        if(image != NULL) {
-            delete image;
-            image = NULL;
+        if(texture != NULL) {
+            delete texture;
+            texture = NULL;
         }
-        image = new ofImage();
-        bool completed = image->loadImage(path);
+        ofImage * imageLoader = new ofImage();
+        bool completed = imageLoader->loadImage(path);
         if(!completed) {
             ofLog(OF_LOG_WARNING, "ofxParallaxLayer did not load image: " + path);
+        } else {
+            texture = new ofTexture();
+            texture->allocate(imageLoader->getPixelsRef());
+            texture->loadData(imageLoader->getPixelsRef());
         }
         
+        pos = position;
+    }
+    
+    void setup(ofTexture * tex, ofPoint position) {
+        if(texture != NULL) {
+            delete texture;
+            texture = NULL;
+        }
+        texture = tex;
         pos = position;
     }
     
@@ -40,14 +53,15 @@ struct ofxParallaxLayer {
         transformation.makeIdentityMatrix();
         ofPushMatrix();
         transformation.preMultTranslate(pos);
-        image->draw(0, 0);
+        texture->draw(0, 0);
         ofPopMatrix();
     }
     
     // Variables
-    ofImage * image;
+    ofTexture * texture;
     ofPoint pos;
     ofMatrix4x4 transformation;
+
 };
 
 struct ofxParallaxLayers {
@@ -72,11 +86,16 @@ struct ofxParallaxLayers {
         
     }
     
+    void setupLayersWithTexture(ofTexture * tex, ofPoint pos) {
+        ofxParallaxLayer * pnew =  new ofxParallaxLayer();
+        pnew->setup(tex, pos);
+        layer.push_back(pnew);
+    }
+    
     void addToLayers(string path, ofPoint pos) {
         ofxParallaxLayer * pnew =  new ofxParallaxLayer();
         pnew->setup(path, pos);
         layer.push_back(pnew);
-        
     }
     
     void setup() {
@@ -130,8 +149,12 @@ struct ofxParallaxLayers {
         }
         
         transformation.makeIdentityMatrix();
-        transformation.preMultScale(scale);
         transformation.preMultTranslate(offset);
+        if(zoomTopLeft != ofVec2f::zero()) {
+            transformation.preMultTranslate(zoomTopLeft);
+        }
+        transformation.preMultScale(scale);
+        
     }
     
     void draw() {
@@ -204,6 +227,11 @@ struct ofxParallaxLayers {
         }
     }
     
+    void setZoom(ofVec3f newScale, ofVec2f zoomOrigin) {
+        scale = newScale;
+        zoomTopLeft = zoomOrigin;
+    }
+    
     //-----------------
     vector<ofxParallaxLayer*> layer;
     ofFbo* fboLayer;
@@ -213,6 +241,7 @@ struct ofxParallaxLayers {
     ofPoint collision;
     ofMatrix4x4 transformation;
     ofVec3f scale;
+    ofVec2f zoomTopLeft;
     
     bool isBlurred;
     bool hasRenderedTexture;
@@ -228,6 +257,14 @@ public:
         
     }
     ~ofxParallax() {
+        removeLayers();
+    };
+    
+    void setup() {
+        
+    }
+    
+    void removeLayers() {
         if(layers.size() != 0) {
             int size = layers.size()-1;
             for(int i=size; i>=0; i--){
@@ -238,28 +275,60 @@ public:
             }
         }
         layers.clear();
-    };
-    
-    void setup() {
-        
     }
     
-//    
-//    void setupLayers(int number, ofVec2f origin, float speed) {
-//        for(int i = 0; i<= number-1; i++) {
-//            int hardcoded = 1024;
-//            ofxParallaxLayers* theLayer = new ofxParallaxLayers();
-//            ofPoint pos = ofPoint(-((hardcoded/2 + ofGetWidth()/2)/2), 0);
-////            ofPoint collision = ofPoint(-(hardcoded - ofGetWidth()), 0);
-//            ofPoint collision = ofPoint(-hardcoded, 0);
-//            theLayer->collision = collision;
-//            theLayer->offset = pos;
-//            theLayer->speed = speed;
-//            theLayer->setup();
-//            
-//            layers.push_back(theLayer);
-//        }
-//    }
+    bool loadDirectory(string directory) {
+        
+        vector<string> imageSequencePaths;
+        ofDirectory dir(directory);
+        int numOfFiles = dir.listDir();
+        for(int i=0; i<numOfFiles; i++) {
+            ofLog(OF_LOG_NOTICE, "loading... " + dir.getPath(i));
+            imageSequencePaths.push_back(dir.getPath(i));
+        }
+        
+        bool bLoaded = imageSequencePaths.size() > 0;
+        if(bLoaded == false) {
+            return false;
+        }
+        
+        if(layers.size() != 0) {
+            removeLayers();
+        }
+        
+        for(int i=0; i<imageSequencePaths.size(); i++) {
+            
+            ofImage * imageLoader = new ofImage();
+            ofTexture * texture = NULL;
+            bool completed = imageLoader->loadImage(imageSequencePaths[i]);
+            if(!completed) {
+                ofLog(OF_LOG_WARNING, "ofxParallaxLayer did not load image: " + imageSequencePaths[i]);
+            } else {
+                texture = new ofTexture();
+                texture->allocate(imageLoader->getPixelsRef());
+                texture->loadData(imageLoader->getPixelsRef());
+                
+                if(!texture->isAllocated()) {
+                    completed = false;
+                }
+                
+                imageLoader->clear();
+                delete imageLoader;
+                imageLoader = NULL;
+            }
+            
+            if(completed) {
+                addNewLayer(i,                              // layer index
+                            ofVec2f(0, 0),                  // origin point (topleft)
+                            ofVec2f(texture->getWidth(), texture->getHeight()),         // size
+                            getLayerSpeed(i),                         // index speed;
+                            ofVec2f(-(texture->getWidth()/2), +(texture->getWidth()/2))   // collision left and collision right
+                            );
+                layers[i]->setupLayersWithTexture(texture, ofPoint(0,0));
+            }
+        }
+        return bLoaded;
+    }
     
     void addNewLayer(int layer, ofVec2f origin, ofVec2f size, float speed, ofVec2f collision = ofVec2f::zero()) {
         if(layers.size()-1 == layer) {
@@ -269,7 +338,6 @@ public:
         } else {
 
             ofxParallaxLayers* theLayer = new ofxParallaxLayers();
-            //            ofPoint collision = ofPoint(-(hardcoded - ofGetWidth()), 0);
             if(collision == ofVec2f::zero()) {
                 collision = ofPoint(-(origin.x - size.x/2), origin.x + size.x);
             }
@@ -358,6 +426,49 @@ public:
     int getTotalLayersSize() {
         return layers.size();
     }
+    
+    void zoomAll(ofVec3f zoom, ofVec2f zoomOrigin) {
+        if(layers.size() != 0) {
+            int number = layers.size()-1;
+            for(int i = 0; i<=number;i++) {
+                layers[i]->setZoom(zoom, zoomOrigin);
+            }
+        }
+    }
+    
+    virtual const float getLayerSpeed(int layerIndex) {
+        // with 6 layers.
+        float layerSpeed = 0.0f;
+        switch (layerIndex) {
+            case 0:
+                layerSpeed = 5 * 360;
+                break;
+            case 1:
+                layerSpeed = 5 * 330;
+                break;
+            case 2:
+                layerSpeed = 5 * 300;
+                break;
+            case 3:
+                layerSpeed = 5 * 130;
+                break;
+            case 4:
+                layerSpeed = 5 * 90;
+                break;
+            case 5:
+                layerSpeed = 5 * 80;
+                break;
+            case 6:
+                layerSpeed = 5 * 50;
+                break;
+            default:
+                layerSpeed = 0.0f;
+                ofLog(OF_LOG_WARNING, "ofxParallax:: getLayerSpeed: Outside of default set speeds. Please implement your own.");
+                break;
+        }
+        return layerSpeed;
+    }
+
     
     
 protected:
