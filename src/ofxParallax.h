@@ -101,6 +101,7 @@ struct ofxParallaxLayers {
     void setup() {
         
         scale = ofVec3f(0.5f,0.5f,0.5f);
+        dynamicScale = ofVec3f(1.0f,1.0f,1.0f);
         fboLayer = new ofFbo();
         
         if(size.x < 1 || size.y < 1) {
@@ -153,7 +154,7 @@ struct ofxParallaxLayers {
         if(zoomTopLeft != ofVec2f::zero()) {
             transformation.preMultTranslate(zoomTopLeft);
         }
-        transformation.preMultScale(scale);
+        transformation.preMultScale(scale * dynamicScale);
         
     }
     
@@ -228,7 +229,7 @@ struct ofxParallaxLayers {
     }
     
     void setZoom(ofVec3f newScale, ofVec2f zoomOrigin) {
-        scale = newScale;
+        dynamicScale = newScale;
         zoomTopLeft = zoomOrigin;
     }
     
@@ -241,6 +242,7 @@ struct ofxParallaxLayers {
     ofPoint collision;
     ofMatrix4x4 transformation;
     ofVec3f scale;
+    ofVec3f dynamicScale;
     ofVec2f zoomTopLeft;
     
     bool isBlurred;
