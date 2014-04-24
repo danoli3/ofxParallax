@@ -150,11 +150,9 @@ struct ofxParallaxLayers {
         }
         
         transformation.makeIdentityMatrix();
-        transformation.preMultTranslate(offset);
-        if(zoomTopLeft != ofVec2f::zero()) {
-            transformation.preMultTranslate(zoomTopLeft);
-        }
+        transformation.preMultTranslate(offset - zoomTopLeft);
         transformation.preMultScale(scale * dynamicScale);
+        
         
     }
     
@@ -230,7 +228,13 @@ struct ofxParallaxLayers {
     
     void setZoom(ofVec3f newScale, ofVec2f zoomOrigin) {
         dynamicScale = newScale;
-        zoomTopLeft = zoomOrigin;
+        zoomTopLeft = ofVec2f(zoomOrigin.x, zoomOrigin.y);
+        
+//        ofMatrix4x4 max;
+//        max = max.newTranslationMatrix(zoomOrigin.x, zoomOrigin.y, 0);
+//        max.preMult(transformation);
+//        ofVec3f trans = max.getTranslation();
+//        zoomTopLeft = ofVec2f(trans.x, trans.y);
     }
     
     //-----------------
